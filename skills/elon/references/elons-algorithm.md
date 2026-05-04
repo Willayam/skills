@@ -1,9 +1,8 @@
----
-name: elon-algo
-description: Apply Elon Musk's Algorithm to anything - code, processes, workflows, systems, products, projects. Walks the 5 steps in strict order (question every requirement, delete, simplify, accelerate, automate) and, when relevant, layers in the 3 cultural ingredients (expand the product to the customer's entire experience, inject urgency and accountability, eat your own dog food). Use when asked to run the Elon algo, simplify something, audit a process for bloat, question whether something should exist, cut scope, attack a bottleneck, or rethink a system.
----
-
 # Elon's Algorithm
+
+Detailed reference for `skills/elon`. Read this only when the user's request
+requires a full Algorithm pass over code, processes, workflows, systems,
+products, projects, or organizations.
 
 Based on Jon McNeill's *The Algorithm* (Penguin Portfolio, 2026). McNeill was president of Tesla under Elon 2015 to 2018 and later applied the method at Lululemon, GM, SpaceX alumni ventures, and his incubator DVx.
 

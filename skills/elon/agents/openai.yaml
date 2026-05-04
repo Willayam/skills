@@ -1,7 +1,7 @@
 interface:
   display_name: "Elon Musk"
-  short_description: "Apply first-principles and 10x thinking"
-  default_prompt: "Use $elon to challenge assumptions from first principles and push for a faster, simpler path."
+  short_description: "Apply first-principles, 10x thinking, and Elon's Algorithm"
+  default_prompt: "Use $elon to challenge assumptions from first principles or run Elon's Algorithm on this system, process, product, or plan."
 
 policy:
   allow_implicit_invocation: true

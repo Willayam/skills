@@ -7,7 +7,7 @@ Shared agent skills packaged in the `skills.sh` style.
 ```bash
 npx skills add https://github.com/willayam/skills --skill unconfuse
 npx skills add https://github.com/willayam/skills --skill create-skill
-npx skills add https://github.com/willayam/skills --skill advisor hormozi katie tony derek elon elon-algo charlie marcus naval steve
+npx skills add https://github.com/willayam/skills --skill advisor hormozi katie tony derek elon charlie marcus naval steve
 ```
 
 If you publish this under a different GitHub owner or repo name, update the URL accordingly.
@@ -23,7 +23,6 @@ skills/
     ├── create-skill/
     ├── derek/
     ├── elon/
-    ├── elon-algo/
     ├── hormozi/
     ├── katie/
     ├── marcus/
@@ -39,8 +38,7 @@ skills/
 - `advisor`: Orchestrate multiple personal advisor lenses for big decisions.
 - `charlie`: Channel Charlie Munger for inversion, incentives, and decision quality.
 - `derek`: Channel Derek Sivers for simple, contrarian thinking.
-- `elon`: Channel Elon Musk for first-principles, 10x thinking, and urgency.
-- `elon-algo`: Apply Elon's Algorithm to systems, processes, code, products, and workflows.
+- `elon`: Channel Elon Musk for first-principles, 10x thinking, urgency, and Elon's Algorithm.
 - `hormozi`: Channel Alex Hormozi for offers, pricing, sales, and revenue math.
 - `katie`: Channel Byron Katie for self-inquiry and The Work.
 - `marcus`: Channel Marcus Aurelius for Stoic perspective and emotional regulation.
