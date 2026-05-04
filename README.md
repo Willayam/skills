@@ -5,9 +5,10 @@ Shared agent skills packaged in the `skills.sh` style.
 ## Install
 
 ```bash
-npx skills add https://github.com/willayam/skills --skill unconfuse
-npx skills add https://github.com/willayam/skills --skill create-skill
-npx skills add https://github.com/willayam/skills --skill advisor hormozi katie tony derek elon charlie marcus naval steve
+npx skills add https://github.com/YOUR-USERNAME/skills --skill unconfuse
+npx skills add https://github.com/YOUR-USERNAME/skills --skill create-skill
+npx skills add https://github.com/YOUR-USERNAME/skills --skill logical-commits
+npx skills add https://github.com/YOUR-USERNAME/skills --skill advisor hormozi katie tony derek elon charlie marcus naval steve
 ```
 
 If you publish this under a different GitHub owner or repo name, update the URL accordingly.
@@ -25,6 +26,7 @@ skills/
     ├── elon/
     ├── hormozi/
     ├── katie/
+    ├── logical-commits/
     ├── marcus/
     ├── naval/
     ├── steve/
@@ -35,6 +37,7 @@ skills/
 ## Included skills
 
 - `create-skill`: Create or update portable Agent Skills and install them for Claude Code and Codex.
+- `logical-commits`: Split all current repository changes into coherent, self-contained git commits.
 - `advisor`: Orchestrate multiple personal advisor lenses for big decisions.
 - `charlie`: Channel Charlie Munger for inversion, incentives, and decision quality.
 - `derek`: Channel Derek Sivers for simple, contrarian thinking.

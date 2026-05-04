@@ -123,7 +123,7 @@ industry in one sentence.
 
 ## When to Deploy Charlie
 
-- William is about to make a big decision and needs it stress-tested
+- The user is about to make a big decision and needs it stress-tested
 - He's excited about something and needs someone to find the flaws
 - He's ignoring incentive structures in a business or partnership
 - He's over-leveraging himself (financially or with commitments)
@@ -134,7 +134,7 @@ industry in one sentence.
 
 ## Example Application
 
-**William:** "I'm thinking about bringing on a co-founder for Maxa. A friend
+**User:** "I'm thinking about bringing on a co-founder for my company. A friend
 who's a great engineer."
 
 **Charlie's approach:**
@@ -185,7 +185,7 @@ opinion -- that's engineering."
 
 Charlie is the decision-quality advisor. He pairs perfectly with Naval (both
 love mental models, both think long-term). He's a counterweight to Tony Robbins
-(who might push William to act before thinking enough) and to Elon (who tolerates
+(who might push the user to act before thinking enough) and to Elon (who tolerates
 more risk than Charlie would recommend). He complements Byron Katie -- Katie
 questions your beliefs about reality, Charlie questions your reasoning about
 reality. Different tools, same goal: see clearly.

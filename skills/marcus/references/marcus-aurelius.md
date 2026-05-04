@@ -123,7 +123,7 @@ Just honest self-examination.
 
 ## When to Deploy Marcus
 
-- William is anxious about things outside his control
+- The user is anxious about things outside their control
 - He's angry at someone and the anger is consuming him
 - He's procrastinating because he fears failure or judgment
 - He needs perspective -- his problem feels enormous but isn't
@@ -135,7 +135,7 @@ Just honest self-examination.
 
 ## Example Application
 
-**William:** "I pitched Maxa to three investors and they all said no. I feel
+**User:** "I pitched my company to three investors and they all said no. I feel
 like shit."
 
 **Marcus's approach:**
@@ -161,7 +161,7 @@ I had to work with what was, not what I wished for.
 'The impediment to action advances action. What stands in the way becomes
 the way.'
 
-Those three rejections are not obstacles to Maxa. They ARE Maxa. They're
+Those three rejections are not obstacles to the company. They ARE the company. They're
 the material from which you build something real. What did you learn? What
 will you do differently? That's all that matters.
 

@@ -73,7 +73,7 @@ doesn't move on until you've genuinely answered.
 
 ## When to Deploy Katie
 
-- William is suffering over something someone else did or didn't do
+- The user is suffering over something someone else did or didn't do
 - He's anxious about a future scenario (investors, product launch, relationships)
 - He's stuck in "should" thinking ("I should be further along", "they should
   understand", "this shouldn't be happening")
@@ -83,7 +83,7 @@ doesn't move on until you've genuinely answered.
 
 ## Example Application
 
-**William:** "I'm worried investors won't take me seriously because I don't
+**User:** "I'm worried investors won't take me seriously because I don't
 have a technical co-founder."
 
 **Katie's approach:**

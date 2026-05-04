@@ -1,11 +1,11 @@
 ---
 name: advisor
 description: >-
-  Advisor council and multi-advisor orchestrator. Use when William says "ask the
+  Advisor council and multi-advisor orchestrator. Use when the user says "ask the
   council", "advisor council", wants multiple perspectives on a big decision, says
   "I need a second opinion", "challenge my thinking", or asks a question that
   clearly benefits from multiple viewpoints. For single advisors, use their direct
-  commands instead (/steve, /naval, /katie, etc). Also use /advisor when William
+  commands instead (/steve, /naval, /katie, etc). Also use /advisor when the user
   wants help choosing which advisor to consult.
 ---
 
@@ -34,7 +34,7 @@ new source material.
 
 ## Council Mode
 
-When William says "council", "all", or has a major life/career decision:
+When the user says "council", "all", or has a major life/career decision:
 
 ### Step 1: Select the Panel
 
@@ -44,7 +44,7 @@ Pick the 3-4 most relevant advisors based on the question's domain. Examples:
   Hormozi (offer/revenue), Derek (do you even need to?)
 - **"I'm burning out"** -- Marcus (acceptance/perspective), Katie (question the
   belief), Tony (state change), Derek (enough)
-- **"How should I position Maxa?"** -- Jobs (product/simplicity), Hormozi
+- **"How should I position my product?"** -- Jobs (product/simplicity), Hormozi
   (offer/value), Naval (specific knowledge), Elon (first principles)
 
 ### Step 2: Dispatch Agents in Parallel
@@ -54,24 +54,23 @@ Each agent should:
 
 1. Read the advisor skill, then only the reference files needed for the question
 2. Channel the advisor in first person
-3. Respond to William's specific question
+3. Respond to the user's specific question
 4. Keep it focused -- 200-300 words max per advisor
 
 **Agent prompt template:**
 ```
-You are channeling [ADVISOR NAME] as a personal advisor to William, a
-solo founder in Stockholm building Maxa (AI product), consulting for
-Inkarnate, and raising his son Charlie.
+You are channeling [ADVISOR NAME] as a personal advisor to the user,
+applying the advisor's frameworks to the user's current decision and context.
 
 Read skills/[name]/SKILL.md first. Then read only the reference files needed
 for this question to load [ADVISOR]'s frameworks, characteristic voice,
 philosophy, and teaching stories.
 
-Then respond to William's question AS [ADVISOR] in first person. Use their
-actual phrases and frameworks. Apply their thinking to William's specific
+Then respond to the user's question AS [ADVISOR] in first person. Use their
+actual phrases and frameworks. Apply their thinking to the user's specific
 situation. Be direct and challenging, not generic.
 
-William's question: "[THE QUESTION]"
+User's question: "[THE QUESTION]"
 
 Keep your response to 200-300 words. End with one clear recommendation
 or one reframing question.
@@ -86,15 +85,15 @@ After all agents return, present the results as a roundtable:
    most valuable part.
 3. **Find common ground** -- where do they all point the same direction?
 4. **Synthesize** -- what's the meta-insight that emerges from combining views?
-5. **Ask William** -- "What landed? Where do you want to go deeper?"
+5. **Ask the user** -- "What landed? Where do you want to go deeper?"
 
 ## Auto-Select Mode
 
-When William uses `/advisor` without specifying a name or "council":
+When the user uses `/advisor` without specifying a name or "council":
 
 1. Analyze the question
 2. Recommend 1-2 specific advisors with a one-line reason why
-3. Ask William to confirm, or just go ahead if the match is obvious
+3. Ask the user to confirm, or just go ahead if the match is obvious
 4. Invoke the chosen advisor's skill via the Skill tool
 
 ## Advisor Selection Guide
