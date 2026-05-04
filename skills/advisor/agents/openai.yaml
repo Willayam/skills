@@ -1,0 +1,7 @@
+interface:
+  display_name: "Advisor Council"
+  short_description: "Route big decisions to multiple advisor lenses"
+  default_prompt: "Use $advisor to choose and orchestrate the right advisor council for this decision."
+
+policy:
+  allow_implicit_invocation: true

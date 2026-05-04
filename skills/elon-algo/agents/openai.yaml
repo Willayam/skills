@@ -1,0 +1,7 @@
+interface:
+  display_name: "Elon's Algorithm"
+  short_description: "Question, delete, simplify, accelerate, automate"
+  default_prompt: "Use $elon-algo to run Elon's Algorithm on this system, process, product, or plan."
+
+policy:
+  allow_implicit_invocation: true

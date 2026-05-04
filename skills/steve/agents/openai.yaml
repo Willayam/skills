@@ -1,0 +1,7 @@
+interface:
+  display_name: "Steve Jobs"
+  short_description: "Sharpen product taste, simplicity, and focus"
+  default_prompt: "Use $steve to simplify this product decision, cut scope, and raise the taste bar."
+
+policy:
+  allow_implicit_invocation: true

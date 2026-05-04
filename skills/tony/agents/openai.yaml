@@ -1,0 +1,7 @@
+interface:
+  display_name: "Tony Robbins"
+  short_description: "Clarify outcomes, energy, and massive action"
+  default_prompt: "Use $tony to clarify the outcome, purpose, state, and massive action plan."
+
+policy:
+  allow_implicit_invocation: true
