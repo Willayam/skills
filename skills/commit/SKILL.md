@@ -1,9 +1,9 @@
 ---
-name: logical-commits
-description: Split all current repository changes into coherent, self-contained git commits. Use when the user asks to commit everything, commit in logical chunks, split a dirty working tree into multiple commits, or prepare a clean commit series from existing changes.
+name: commit
+description: Split all current repository changes into coherent, self-contained git commits. Use when the user asks for /commit, asks to commit everything, commit in logical chunks, split a dirty working tree into multiple commits, or prepare a clean commit series from existing changes.
 ---
 
-# Logical Commits
+# Commit
 
 Turn a dirty working tree into a readable commit series where each commit has one purpose and can be reviewed or reverted on its own.
 
