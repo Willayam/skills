@@ -1,0 +1,7 @@
+interface:
+  display_name: "Logical Commits"
+  short_description: "Commit dirty worktrees in coherent chunks"
+  default_prompt: "Use $logical-commits to split all current repository changes into logical git commits."
+
+policy:
+  allow_implicit_invocation: true
