@@ -5,7 +5,7 @@ sequencing, strategy, advisor moves, traps, and prompt patterns drawn from
 Part III of *The Book of Elon*: "Building Companies."
 
 Source note: These are derived notes from *The Book of Elon*, Part III
-("Building Companies"), using `.context/book-of-elon.txt` and the public PDF:
+("Building Companies"), using the public PDF:
 https://book-of-elon.s3.us-east-2.amazonaws.com/The+Book+of+Elon+Free+PDF.pdf.
 Page references use the book pagination, e.g. `[Book, p. 168]`.
 
