@@ -8,6 +8,7 @@ Shared agent skills packaged in the `skills.sh` style.
 npx skills add https://github.com/YOUR-USERNAME/skills --skill unconfuse
 npx skills add https://github.com/YOUR-USERNAME/skills --skill create-skill
 npx skills add https://github.com/YOUR-USERNAME/skills --skill commit
+npx skills add https://github.com/YOUR-USERNAME/skills --skill behavioral-design-audit
 npx skills add https://github.com/YOUR-USERNAME/skills --skill advisor hormozi katie tony derek elon charlie marcus naval steve
 ```
 
@@ -20,6 +21,7 @@ skills/
 ├── README.md
 └── skills/
     ├── advisor/
+    ├── behavioral-design-audit/
     ├── charlie/
     ├── commit/
     ├── create-skill/
@@ -39,6 +41,7 @@ skills/
 - `create-skill`: Create or update portable Agent Skills and install them for Claude Code and Codex.
 - `commit`: Split all current repository changes into coherent, self-contained git commits. Invoke as `/commit`.
 - `advisor`: Orchestrate multiple personal advisor lenses for big decisions.
+- `behavioral-design-audit`: Audit apps or websites for behavioral design patterns, dark patterns, engagement mechanics, and ethical persuasive design.
 - `charlie`: Channel Charlie Munger for inversion, incentives, and decision quality.
 - `derek`: Channel Derek Sivers for simple, contrarian thinking.
 - `elon`: Channel Elon Musk for first-principles, 10x thinking, urgency, and Elon's Algorithm.
