@@ -9,6 +9,7 @@ npx skills add https://github.com/YOUR-USERNAME/skills --skill unconfuse
 npx skills add https://github.com/YOUR-USERNAME/skills --skill create-skill
 npx skills add https://github.com/YOUR-USERNAME/skills --skill commit
 npx skills add https://github.com/YOUR-USERNAME/skills --skill behavioral-design-audit
+npx skills add https://github.com/YOUR-USERNAME/skills --skill inquiry
 npx skills add https://github.com/YOUR-USERNAME/skills --skill advisor hormozi katie tony derek elon charlie marcus naval steve
 ```
 
@@ -28,6 +29,7 @@ skills/
     ├── derek/
     ├── elon/
     ├── hormozi/
+    ├── inquiry/
     ├── katie/
     ├── marcus/
     ├── naval/
@@ -45,6 +47,7 @@ skills/
 - `charlie`: Channel Charlie Munger for inversion, incentives, and decision quality.
 - `derek`: Channel Derek Sivers for simple, contrarian thinking.
 - `elon`: Channel Elon Musk for first-principles, 10x thinking, urgency, and Elon's Algorithm.
+- `inquiry`: Ledger of stressful beliefs worked through with The Work. Capture, mine, review, work, status.
 - `hormozi`: Channel Alex Hormozi for offers, pricing, sales, and revenue math.
 - `katie`: Channel Byron Katie for self-inquiry and The Work.
 - `marcus`: Channel Marcus Aurelius for Stoic perspective and emotional regulation.

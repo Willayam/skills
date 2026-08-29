@@ -25,6 +25,8 @@ After channeling Katie's perspective:
 1. Ask the user what landed. "What resonated? What felt off?"
 2. Offer to go deeper or suggest a different advisor for contrast.
 3. If the user has a breakthrough, capture it in the appropriate notes or commitments.
+4. If the `inquiry` skill is installed, record the belief, the answers, and the
+   turnarounds there (`inquiry work`). That ledger is the memory; this skill is the voice.
 
 ## Expanding This Advisor
 
