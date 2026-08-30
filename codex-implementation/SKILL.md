@@ -1,6 +1,6 @@
 ---
 name: codex-implementation
-description: Ask Codex CLI (gpt-5.5) to implement a scoped, well-specified change with repo write access, then verify its diff. This is how gpt-5.5 is invoked for implementation work. Use when the user asks Claude to have Codex or gpt-5.5 build or edit code, when the model-selection rubric routes bulk or clear-spec implementation to gpt-5.5, or for mechanical changes, migrations, and clear-spec features. For work Claude should implement itself, use the normal editing flow instead.
+description: Ask Codex CLI (gpt-5.6-sol) to implement a scoped, well-specified change with repo write access, then verify its diff. This is how gpt-5.6-sol is invoked for implementation work. Use when the user asks Claude to have Codex or gpt-5.6-sol build or edit code, when the model-selection rubric routes bulk or clear-spec implementation to gpt-5.6-sol, or for mechanical changes, migrations, and clear-spec features. For work Claude should implement itself, use the normal editing flow instead.
 ---
 
 # Codex Implementation
