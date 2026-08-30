@@ -43,7 +43,7 @@ skills/
 ## Included skills
 
 - `create-skill`: Create or update portable Agent Skills and install them for Claude Code and Codex.
-- `commit`: Split all current repository changes into coherent, self-contained git commits. Invoke as `/commit`.
+- `commit`: Split a dirty worktree into small, reviewable commits grouped by intent. Invoke as `/commit`.
 - `unconfuse`: Audit a codebase for contradictory patterns, ambiguous defaults, and code-versus-doc mismatches.
 - `behavioral-design-audit`: Audit apps or websites for behavioral design patterns, dark patterns, engagement mechanics, and ethical persuasive design.
 - `inquiry`: Ledger of stressful beliefs worked through with The Work. Capture, mine, review, work, status.
