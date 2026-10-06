@@ -1,0 +1,26 @@
+{
+  "skill_name": "research",
+  "evals": [
+    {
+      "id": 0,
+      "name": "omega3-brain-health",
+      "prompt": "Vad sager forskningen om omega-3 och hjarnhalsa? Finns det bra studier som visar effekt, och vem har finansierat dem?",
+      "expected_output": "A research briefing with scientific papers about omega-3 and brain health, including funding sources and any conflict of interest flags (e.g. supplement industry funding)",
+      "files": []
+    },
+    {
+      "id": 1,
+      "name": "screentime-children",
+      "prompt": "Jag vill veta vad forskningen sager om effekten av skarmtid pa barn under 5 ar. Ge mig de mest palitliga studierna.",
+      "expected_output": "A research briefing with peer-reviewed studies on screen time effects on children under 5, ranked by reliability with funding transparency",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "sleep-learning-preschool",
+      "prompt": "Finns det studier som visar att somn paverkar barns inlarning i forskolealdern? Jag vill ha riktigt palitliga kallor.",
+      "expected_output": "A research briefing with studies on sleep and learning in preschool-age children, with funding sources, COI statements, and emphasis on meta-analyses/systematic reviews",
+      "files": []
+    }
+  ]
+}

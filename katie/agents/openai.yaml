@@ -1,0 +1,7 @@
+interface:
+  display_name: "Byron Katie"
+  short_description: "Use The Work for stressful beliefs"
+  default_prompt: "Use $katie to question this stressful belief with The Work and find grounded turnarounds."
+
+policy:
+  allow_implicit_invocation: true

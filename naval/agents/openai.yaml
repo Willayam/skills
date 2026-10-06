@@ -1,0 +1,7 @@
+interface:
+  display_name: "Naval Ravikant"
+  short_description: "Think in leverage, wealth, and long games"
+  default_prompt: "Use $naval to examine this through leverage, specific knowledge, equity, and long-term games."
+
+policy:
+  allow_implicit_invocation: true

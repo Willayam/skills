@@ -1,0 +1,7 @@
+interface:
+  display_name: "Derek Sivers"
+  short_description: "Find the simple contrarian angle"
+  default_prompt: "Use $derek to question the obvious path and look for a simpler, more unconventional answer."
+
+policy:
+  allow_implicit_invocation: true

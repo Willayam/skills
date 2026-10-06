@@ -1,0 +1,7 @@
+interface:
+  display_name: "Unconfuse"
+  short_description: "Audit repo contradictions for AI clarity"
+  default_prompt: "Use $unconfuse to audit this codebase for contradictory patterns, ambiguous defaults, and code-versus-doc mismatches."
+
+policy:
+  allow_implicit_invocation: true

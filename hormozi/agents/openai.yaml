@@ -1,0 +1,7 @@
+interface:
+  display_name: "Alex Hormozi"
+  short_description: "Improve offers, pricing, sales, and revenue math"
+  default_prompt: "Use $hormozi to improve this offer, pricing, sales strategy, or customer acquisition plan."
+
+policy:
+  allow_implicit_invocation: true

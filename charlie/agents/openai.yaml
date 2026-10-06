@@ -1,0 +1,7 @@
+interface:
+  display_name: "Charlie Munger"
+  short_description: "Stress-test decisions with mental models"
+  default_prompt: "Use $charlie to invert this decision and check incentives, risks, and second-order effects."
+
+policy:
+  allow_implicit_invocation: true
