@@ -21,6 +21,7 @@ Engineering:
 - `codex-implementation`: Hand a scoped, well-specified change to Codex CLI, then verify its diff.
 - `codex-review`: Get an independent Codex CLI review of uncommitted changes, a branch diff, or a commit.
 - `codex-computer-use`: Have Codex CLI drive a browser, simulator, or running app to verify behavior.
+- `t3-worktree-cleanup`: Weekly scheduled cleanup of finished git worktrees on a machine running T3 Code.
 
 Research:
 
