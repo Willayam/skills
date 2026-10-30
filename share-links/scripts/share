@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Copy a file or folder into the share root and print a link that keeps working.
+
+  share <path> [--name NAME] [--project PROJECT] [--replace]
+
+The copy goes to ~/shared/<project>/<name>/, so it outlives the session, the worktree and a reboot.
+Every share gets its own URL. When the name is taken it becomes name-2, name-3 and so on, so an
+earlier link keeps showing what it showed. --replace overwrites the name instead. The first line
+printed is the link to post. It works on every device on the tailnet.
+
+The project defaults to the repository name. The name defaults to the file or folder name, or to
+the branch when the folder is a generic build folder like dist.
+"""
+import argparse
+import errno
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+sys.dont_write_bytecode = True  # Keep __pycache__ out of the skill folder.
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from common import config, local_origin  # noqa: E402
+
+GENERIC = {"dist", "build", "out", "output", "public", "site", "www", "static", "html", "export", "_site"}
+# The server never serves dot names, so they are not copied either. That keeps .env files out of ~/shared.
+SKIP = shutil.ignore_patterns(".*", "node_modules")
+
+
+def git(cwd, *args):
+    try:
+        out = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=10)
+        return out.stdout.strip() if out.returncode == 0 else ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def slug(s):
+    return re.sub(r"[^a-z0-9._-]+", "-", s.lower()).strip("-.") or "share"
+
+
+def project_of(folder):
+    """The repository's name. A worktree reports its main checkout, so every worktree of a repo agrees."""
+    for cwd in (folder, os.getcwd()):
+        common = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        if common:
+            repo = os.path.dirname(common) if os.path.basename(common) == ".git" else common
+            return os.path.basename(repo).removesuffix(".git")
+    return "misc"
+
+
+def name_of(src, folder, project):
+    base = os.path.splitext(os.path.basename(src))[0] if os.path.isfile(src) else os.path.basename(src)
+    if base.lower() in GENERIC or slug(base) == slug(project):
+        branch = git(folder, "branch", "--show-current")
+        if branch:
+            return branch.rsplit("/", 1)[-1]
+    return base
+
+
+def size_mb(path):
+    if os.path.isfile(path):
+        return os.path.getsize(path) / 1e6
+    total = 0
+    for d, _, files in os.walk(path):
+        total += sum(os.path.getsize(os.path.join(d, f)) for f in files if os.path.isfile(os.path.join(d, f)))
+    return total / 1e6
+
+
+def claim(new, parent, name):
+    """Move the staged copy to the first free name. rename fails on a folder that has files, so two shares can't take the same one."""
+    n = 1
+    while True:
+        taken = name if n == 1 else "%s-%d" % (name, n)
+        dest = os.path.join(parent, taken)
+        if not os.path.lexists(dest):
+            try:
+                os.rename(new, dest)
+                return taken
+            except OSError as e:
+                if e.errno not in (errno.EEXIST, errno.ENOTEMPTY):
+                    raise
+        n += 1
+
+
+def main():
+    p = argparse.ArgumentParser(description="Copy a file or folder to the share server and print its link.")
+    p.add_argument("path")
+    p.add_argument("--name", help="URL name, default from the file, folder or branch")
+    p.add_argument("--project", help="URL project, default from the repository")
+    p.add_argument("--replace", action="store_true", help="overwrite the name instead of taking the next free one")
+    a = p.parse_args()
+
+    src = os.path.abspath(a.path)
+    if not os.path.exists(src):
+        sys.exit("share: %s does not exist" % a.path)
+    if os.path.basename(src).startswith("."):
+        sys.exit("share: %s starts with a dot, and the server never serves dot names" % a.path)
+    folder = src if os.path.isdir(src) else os.path.dirname(src)
+    project = slug(a.project or project_of(folder))
+    name = slug(a.name or name_of(src, folder, project))
+
+    cfg = config()
+    root = cfg["root"]
+    dest = os.path.join(root, project, name)
+    if os.path.commonpath([os.path.realpath(src), os.path.realpath(dest)]) == os.path.realpath(src):
+        sys.exit("share: %s contains the share root, so share a folder inside it" % a.path)
+
+    # Copy into a staging folder first, then swap it in, so a reader never sees half a copy.
+    staging = os.path.join(root, ".staging")
+    os.makedirs(staging, exist_ok=True)
+    stamp = "%s-%d" % (time.strftime("%Y%m%d%H%M%S"), os.getpid())
+    new = os.path.join(staging, stamp)
+    if os.path.isdir(src):
+        shutil.copytree(src, new, symlinks=True, ignore=SKIP)
+        page = ""
+    else:
+        os.makedirs(new)
+        shutil.copy2(src, new)
+        page = urllib.parse.quote(os.path.basename(src))
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if a.replace:
+        old = None
+        if os.path.lexists(dest):
+            old = os.path.join(staging, stamp + "-old")
+            os.rename(dest, old)
+        os.rename(new, dest)
+        if old:
+            shutil.rmtree(old, ignore_errors=True)
+    else:
+        name = claim(new, os.path.dirname(dest), name)
+        dest = os.path.join(root, project, name)
+
+    path = "/%s/%s/%s" % (urllib.parse.quote(project), urllib.parse.quote(name), page)
+    local = local_origin(cfg) + path
+    try:
+        urllib.request.urlopen(local, timeout=3).close()
+    except urllib.error.HTTPError:
+        pass  # The server answered.
+    except Exception:
+        print("share: the share server is not answering on %s. Run install.py from the share-links skill." % local_origin(cfg), file=sys.stderr)
+    print((cfg["origin"] or local_origin(cfg)) + path)
+    if cfg["origin"]:
+        print("local: " + local)
+    mb = size_mb(dest)
+    if mb > 200:
+        print("share: copied %.0f MB. Share the build output, not the whole project." % mb, file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
