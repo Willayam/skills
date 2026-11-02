@@ -22,6 +22,7 @@ Engineering:
 - `codex-review`: Get an independent Codex CLI review of uncommitted changes, a branch diff, or a commit.
 - `codex-computer-use`: Have Codex CLI drive a browser, simulator, or running app to verify behavior.
 - `t3-worktree-cleanup`: Weekly scheduled cleanup of finished git worktrees on a machine running T3 Code.
+- `design-lab`: Show design options so they can be judged on a phone or a Mac, as inline pages, hosted video, or throwaway builds with a comment bar.
 - `share-links`: Links to pages, builds and screenshots that still open hours later from a phone, plus release of settled T3 worktrees' leftover dev servers.
 
 Research:

@@ -75,5 +75,9 @@ The installer is safe to run again. It sets up:
 - `share` in `~/.local/bin`
 - the Stop hook in `~/.claude/settings.json` and `~/.codex/hooks.json`
 
+If another service already uses HTTPS 8446 on this Mac, the installer leaves it alone and takes the
+next free port. `install.py --share-only` sets up only the share server, `tailscale serve`, `share`
+and the Stop hook, so it adds no process cleanup and leaves any design-lab server as it is.
+
 Codex runs a new hook only after you trust it once in its `/hooks` screen. Run the installer again
 after moving this folder. `install.py --uninstall` removes everything except `~/shared`.
