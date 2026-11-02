@@ -76,6 +76,20 @@ def served_ports():
     return ports
 
 
+def taken_https_ports(mine):
+    """HTTPS ports `tailscale serve` already gives to something other than the share server."""
+    try:
+        status = json.loads(run([tailscale(), "serve", "status", "--json"]).stdout or "{}")
+    except (OSError, ValueError):
+        return set()
+    taken = {int(p) for p in status.get("TCP", {})}
+    for host, site in status.get("Web", {}).items():
+        targets = {h.get("Proxy", "").rstrip("/") for h in site.get("Handlers", {}).values()}
+        if targets == {mine}:
+            taken.discard(int(host.rsplit(":", 1)[-1]))
+    return taken
+
+
 def label_path(label):
     return os.path.join(AGENTS_DIR, label + ".plist")
 
@@ -156,21 +170,28 @@ def write_config(cfg):
         f.write("\n")
 
 
-def install():
+def install(share_only=False):
     name = tailnet_name()
     cfg = config()
+    taken = taken_https_ports("http://127.0.0.1:%d" % cfg["port"])
+    wanted = cfg["https_port"]
+    while cfg["https_port"] in taken:
+        cfg["https_port"] += 1
+    if cfg["https_port"] != wanted:
+        print("HTTPS port %d serves something else, so links use %d." % (wanted, cfg["https_port"]))
     cfg["origin"] = "https://%s:%d" % (name, cfg["https_port"]) if name else None
     cfg.setdefault("extra_ports", [])
     durable = {cfg["port"], cfg["https_port"]} | served_ports() | set(cfg["extra_ports"])
-    if os.path.exists(LAB):
+    if os.path.exists(LAB) and not share_only:
         durable.add(LAB_PORT)
     cfg["durable_ports"] = sorted(durable)
     write_config(cfg)
     os.makedirs(cfg["root"], exist_ok=True)
 
     load("com.share-links.server", [PYTHON, os.path.join(SCRIPTS, "serve.py")], KeepAlive=True, ThrottleInterval=10)
-    load("com.share-links.release", [PYTHON, os.path.join(SCRIPTS, "release.py"), "--apply"], StartInterval=300)
-    if os.path.exists(LAB):
+    if not share_only:
+        load("com.share-links.release", [PYTHON, os.path.join(SCRIPTS, "release.py"), "--apply"], StartInterval=300)
+    if os.path.exists(LAB) and not share_only:
         # lab.py joins the tailnet by itself once Tailscale is up, so it can start at login.
         stop_stray_lab_server()
         load("com.share-links.design-lab", [PYTHON, LAB, "serve", "--foreground", "--tailnet"],
@@ -217,8 +238,10 @@ def uninstall():
 def main():
     p = argparse.ArgumentParser(description="Install or remove share-links on this Mac.")
     p.add_argument("--uninstall", action="store_true")
+    p.add_argument("--share-only", action="store_true",
+                   help="only the share server, the share command and the link check")
     a = p.parse_args()
-    uninstall() if a.uninstall else install()
+    uninstall() if a.uninstall else install(a.share_only)
 
 
 if __name__ == "__main__":
