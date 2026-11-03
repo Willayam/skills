@@ -1,23 +1,28 @@
 #!/usr/bin/env node
 // Capture pages as one labelled video that plays on phones, or as stills.
 //
-//   node capture.mjs clip out.mp4 --size 390x700 --seconds 6 "A Tight fan=a.html" "B Loose fan=b.html"
+//   node capture.mjs clip out.mp4 --size 960x540 --seconds 6 "A Tight fan=a.html" "B Loose fan=b.html"
 //   node capture.mjs still outdir --size 1440x900 "A Tight fan=a.html" "B Loose fan=https://..."
 //
 // Both:  --size WxH (default 1280x720)  --scale N  --dark  --wait MS (after load)
-// clip:  --seconds N (default 6)  --cols N  --speed 0.5  --run "JS to run at the start"
+// clip:  --seconds N (default 6)  --speed 0.5  --run "JS to run at the start"
+//        --crop WxH+X+Y (CSS px, the part of the page to keep)
+//        --stack (one 1920x1080 clip with the options in sync, instead of out-a.mp4, out-b.mp4 and so on)
+//
+// T3 draws an embedded video in a 16:9 box, so a clip of any other shape shows small there.
+// Use a 16:9 --size, or --crop a 16:9 region around what moves.
 // still: --full (whole page height)
 //
 // Needs Node 22+, Chrome, and ffmpeg for clips. Prints each page's errors and any sideways scroll.
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const USAGE = "usage: capture.mjs clip out.mp4|still outdir [flags] \"A Name=url-or-file\" ...";
-const VALUE_FLAGS = new Set(["size", "scale", "wait", "seconds", "cols", "speed", "run"]);
-const BOOL_FLAGS = new Set(["dark", "full"]);
+const VALUE_FLAGS = new Set(["size", "scale", "wait", "seconds", "speed", "run", "crop"]);
+const BOOL_FLAGS = new Set(["dark", "full", "stack"]);
 
 function parseArgs(argv) {
   const [mode, out, ...rest] = argv;
@@ -45,6 +50,8 @@ function parseArgs(argv) {
   const w = +size[1];
   const h = +size[2];
   const defaultScale = mode === "clip" || w < 800 ? 2 : 1;
+  const crop = flags.crop ? /^(\d+)x(\d+)\+(\d+)\+(\d+)$/.exec(flags.crop) : null;
+  if (flags.crop && !crop) die(`bad --crop ${flags.crop}, expected WxH+X+Y`);
   return {
     mode, out, options, w, h,
     scale: +(flags.scale || defaultScale),
@@ -52,7 +59,8 @@ function parseArgs(argv) {
     full: !!flags.full,
     wait: +(flags.wait ?? (mode === "clip" ? 500 : 1200)),
     seconds: +(flags.seconds || 6),
-    cols: flags.cols ? +flags.cols : w > h ? 1 : Math.min(options.length, 2),
+    stack: !!flags.stack,
+    crop: crop ? { w: +crop[1], h: +crop[2], x: +crop[3], y: +crop[4] } : { w, h, x: 0, y: 0 },
     speed: +(flags.speed || 1),
     run: flags.run || "",
   };
@@ -132,12 +140,14 @@ async function openPage(port) {
 
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
-function labelScript(label) {
+function labelScript(label, a) {
+  const left = a.crop.x + 10;
+  const bottom = a.h - (a.crop.y + a.crop.h) + 10;
   return `window.__labBare = true;
 addEventListener("DOMContentLoaded", function () {
   ${label ? `var d = document.createElement("div");
   d.textContent = ${JSON.stringify(label)};
-  d.style.cssText = "all:initial;position:fixed;left:10px;bottom:10px;z-index:2147483647;pointer-events:none;background:#fff;color:#111;font:600 13px/1 -apple-system,system-ui,sans-serif;padding:6px 8px;border-radius:7px;border:1px solid #111";
+  d.style.cssText = "all:initial;position:fixed;left:${left}px;bottom:${bottom}px;z-index:2147483647;pointer-events:none;background:#fff;color:#111;font:600 13px/1 -apple-system,system-ui,sans-serif;padding:6px 8px;border-radius:7px;border:1px solid #111";
   document.documentElement.appendChild(d);` : ""}
 });`;
 }
@@ -160,7 +170,7 @@ async function loadPage(page, opt, a, label) {
   if (a.dark) {
     await page.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: "dark" }] });
   }
-  await page.send("Page.addScriptToEvaluateOnNewDocument", { source: labelScript(label) });
+  await page.send("Page.addScriptToEvaluateOnNewDocument", { source: labelScript(label, a) });
   return { errors, navigate: async () => {
     const loaded = new Promise((ok) => page.on("Page.loadEventFired", ok));
     await page.send("Page.navigate", { url: opt.url });
@@ -246,29 +256,56 @@ function findFfmpeg() {
   return exe;
 }
 
-function encode(lists, a) {
-  const even = (n) => Math.floor(n / 2) * 2;
-  const gap = lists.length > 1 ? 6 : 0;
-  const cols = Math.max(1, Math.min(a.cols, lists.length));
-  const tileW = even(Math.min(a.w * a.scale, 1920 / cols - gap));
-  const tileH = even((tileW * a.h) / a.w);
-  const inFps = Math.round(30 / a.speed);
-  const inputs = lists.flatMap((l) => ["-f", "concat", "-safe", "0", "-i", l]);
-  const tiles = lists.map((_, i) =>
-    `[${i}:v]fps=${inFps},scale=${tileW}:${tileH}:in_range=full:out_range=tv,format=yuv420p,` +
-    `pad=${tileW + gap}:${tileH + gap}:${gap / 2}:${gap / 2}:color=0x111111[t${i}]`);
-  const layout = lists.map((_, i) =>
-    `${(i % cols) * (tileW + gap)}_${Math.floor(i / cols) * (tileH + gap)}`).join("|");
-  const stack = lists.length > 1
-    ? `${lists.map((_, i) => `[t${i}]`).join("")}xstack=inputs=${lists.length}:layout=${layout}:fill=0x111111[s]`
-    : "[t0]null[s]";
-  const graph = [...tiles, stack, `[s]setpts=PTS/${a.speed},fps=30[v]`].join(";");
-  const r = spawnSync(findFfmpeg(), [
-    "-y", "-loglevel", "error", ...inputs, "-filter_complex", graph, "-map", "[v]",
-    "-t", String(a.seconds / a.speed), "-c:v", "libx264", "-crf", "21", "-preset", "veryfast",
-    "-profile:v", "high", "-level", "4.2", "-color_range", "tv", "-movflags", "+faststart", a.out,
-  ], { stdio: "inherit" });
+function ffmpeg(args) {
+  const r = spawnSync(findFfmpeg(), ["-y", "-loglevel", "error", ...args], { stdio: "inherit" });
   if (r.error || r.status !== 0) die("ffmpeg failed");
+}
+
+const even = (n) => Math.max(2, Math.floor(n / 2) * 2);
+const OUTPUT = ["-c:v", "libx264", "-crf", "21", "-preset", "veryfast", "-profile:v", "high", "-level", "4.2",
+  "-color_range", "tv", "-movflags", "+faststart"];
+
+function tileFilter(index, a, w, h) {
+  const c = a.crop;
+  return `[${index}:v]fps=${Math.round(30 / a.speed)},` +
+    `crop=iw*${c.w / a.w}:ih*${c.h / a.h}:iw*${c.x / a.w}:ih*${c.y / a.h},` +
+    `scale=${w}:${h}:in_range=full:out_range=tv,format=yuv420p`;
+}
+
+function input(list) {
+  return ["-f", "concat", "-safe", "0", "-i", list];
+}
+
+function encodeOne(list, out, a) {
+  const w = even(Math.min(a.crop.w * a.scale, 1920));
+  const h = even((w * a.crop.h) / a.crop.w);
+  const graph = `${tileFilter(0, a, w, h)},setpts=PTS/${a.speed},fps=30[v]`;
+  ffmpeg([...input(list), "-filter_complex", graph, "-map", "[v]", "-t", String(a.seconds / a.speed), ...OUTPUT, out]);
+}
+
+function encodeStack(lists, out, a) {
+  const GAP = 6;
+  const aspect = a.crop.w / a.crop.h;
+  let best = { w: 0 };
+  for (let cols = 1; cols <= lists.length; cols++) {
+    const rows = Math.ceil(lists.length / cols);
+    const w = even(Math.min(1920 / cols - GAP, (1080 / rows - GAP) * aspect));
+    if (w > best.w) best = { w, h: even(w / aspect), cols };
+  }
+  const { w, h, cols } = best;
+  const tiles = lists.map((_, i) => `${tileFilter(i, a, w, h)},pad=${w + GAP}:${h + GAP}:${GAP / 2}:${GAP / 2}:color=0x111111[t${i}]`);
+  const layout = lists.map((_, i) => `${(i % cols) * (w + GAP)}_${Math.floor(i / cols) * (h + GAP)}`).join("|");
+  const grid = lists.length > 1
+    ? `${lists.map((_, i) => `[t${i}]`).join("")}xstack=inputs=${lists.length}:layout=${layout}:fill=0x111111[g]`
+    : "[t0]null[g]";
+  const canvas = `[g]pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0x111111,setpts=PTS/${a.speed},fps=30[v]`;
+  ffmpeg([...lists.flatMap(input), "-filter_complex", [...tiles, grid, canvas].join(";"), "-map", "[v]",
+    "-t", String(a.seconds / a.speed), ...OUTPUT, out]);
+}
+
+function optionPath(out, opt) {
+  const id = opt.label.split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return out.replace(/(\.[a-z0-9]+)?$/i, `-${id}$1`);
 }
 
 const args = parseArgs(process.argv.slice(2));
@@ -280,12 +317,25 @@ try {
     mkdirSync(args.out, { recursive: true });
     for (const opt of args.options) await still(chrome.port, opt, args);
   } else {
+    mkdirSync(dirname(resolve(args.out)), { recursive: true });
     const lists = [];
     for (const [i, opt] of args.options.entries()) {
       lists.push(await record(chrome.port, opt, args, args.options.length > 1, dir, i));
     }
-    encode(lists, args);
-    console.log(resolve(args.out));
+    if (args.stack || args.options.length === 1) {
+      if (args.stack) encodeStack(lists, args.out, args); else encodeOne(lists[0], args.out, args);
+      console.log(resolve(args.out));
+    } else {
+      lists.forEach((list, i) => {
+        const out = optionPath(args.out, args.options[i]);
+        encodeOne(list, out, args);
+        console.log(resolve(out));
+      });
+    }
+    const shape = args.crop.w / args.crop.h;
+    if (!args.stack && Math.abs(shape - 16 / 9) > 0.1) {
+      console.log(`  Note: this clip is ${args.crop.w}x${args.crop.h}. T3 embeds show 16:9, so use --crop or link the file.`);
+    }
   }
 } finally {
   if (chrome) chrome.proc.kill();
