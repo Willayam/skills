@@ -41,22 +41,24 @@ Use `html_preview`, look at the PNG and console output, then call `html_render` 
 - One question per page. Label each option A, B, C under the image, with its name.
 - The frame is 728 px wide on desktop and about 360 on a phone. Use `grid-template-columns: repeat(auto-fit, minmax(300px, 1fr))` so options stack on a phone. Show components at true size.
 - Frames run JavaScript, so toggles and sliders work. The page must be self-contained and under 512 KB.
-- Images load from absolute paths. Local video files do not. Frames can't save anything, so no marking buttons.
+- Images load from absolute paths. Video did not play in a frame on the phone, so it goes in the reply. Frames can't save anything, so no marking buttons.
 - For a real screen, use stills instead of rebuilding it: `node $S/capture.mjs still /tmp/round --size 1440x900 "A Name=URL" "B Name=URL"`. Add `--full` for the page height and `--dark` for dark mode. It prints page errors and sideways scroll.
 
 ## Hosted video
 
-Anything that moves goes in a video, recorded and hosted so it plays on the phone and the Mac:
+Anything that moves goes in a video:
 
 ```bash
-node $S/capture.mjs clip /tmp/fan.mp4 --size 390x700 --seconds 6 \
+node $S/capture.mjs clip /tmp/fan/fan.mp4 --size 960x540 --seconds 6 \
   --run "document.querySelector('.fan').click()" "A Tight fan=a.html" "B Loose fan=b.html"
-share /tmp/fan.mp4 --name fan-r1
+share /tmp/fan --name fan-r1
 ```
 
-The clip stacks the options, labelled and in sync, as H.264 that plays on an iPhone. Add `--speed 0.5` for a slow version of timing questions. It records no sound, so use a build for sound.
+It writes one labelled H.264 clip per option, such as `fan-a.mp4` and `fan-b.mp4`, which play on an iPhone. Add `--speed 0.5` for timing questions. Clips have no sound, so use a build for sound.
 
-`share` prints an HTTPS tailnet URL and copies the file to `~/shared/<project>/<name>/`. In the reply, embed that copy with Markdown image syntax and its absolute path, then put the URL on the next line. A `/tmp` path disappears, so never embed one. For a simulator, use the `record` command from `device_open`.
+T3 draws an embedded video in a 16:9 box about 360 px wide on a phone, so a clip of any other shape shows small. Use a 16:9 `--size`. For a phone design, keep the page at 390 wide and `--crop 390x219+0+300` around what moves, which shows at about true size. `--stack` puts the options in one synced 1920x1080 clip, but each option is then smaller, so use it only when sync matters and the user can go fullscreen. A whole portrait screen only shows large from the link.
+
+`share` copies the folder to `~/shared/<project>/<name>/` and prints its HTTPS tailnet URL. Embed those copies in the reply with Markdown image syntax and their absolute paths, one per option with its letter, and put each clip's URL below it. The embed plays on the phone without Tailscale. The link needs Tailscale. A `/tmp` path disappears, so never embed one. For a simulator, use the `record` command from `device_open`.
 
 ## Throwaway build
 
@@ -73,7 +75,7 @@ Add the comment bar to every web build. Copy `assets/comment.js` next to the pag
 <script src="comment.js" data-title="Fan tools" data-options="A Tight fan, B Loose fan"></script>
 ```
 
-The comment field stays open with the cursor in it. The user dictates a note, taps Next or the keyboard's return key to move on with the cursor kept in the field, then taps Copy all and pastes into the chat. A phone only raises its keyboard after a first tap. Picking B sets `<html data-option="B">` and fires a `labOption` event, so one page can hold every option. For separate pages use `A Tight fan=a.html`. Add `data-corner="top"` when the bar would cover what they are testing. `capture.mjs` hides the bar in stills and clips.
+The comment field stays open with the cursor in it. The user dictates a note, taps Next or the keyboard's return key to move on with the cursor kept in the field, then taps Copy all and pastes into the chat. A phone may raise its keyboard only after a first tap. Picking B sets `<html data-option="B">` and fires a `labOption` event, so one page can hold every option. For separate pages use `A Tight fan=a.html`. A full-height layout should use `height: calc(100dvh - var(--lab-comment-bar, 0px))` so the bar doesn't cover its bottom. `capture.mjs` hides the bar in stills and clips.
 
 ## Every round
 

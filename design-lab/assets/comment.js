@@ -5,11 +5,12 @@
  * data-options lists the versions. Add =url to open another page: "A Tight fan=a.html, B Loose fan=b.html".
  * Without a url, the page switches itself. Picking B sets <html data-option="B"> and window.labOption,
  * fires a window "labOption" event with detail.id, and writes ?option=B to the URL.
- * data-corner="top" moves the bar up when it would cover what is being tested.
+ * On a phone or in a narrow window the bar fills the bottom of the screen and the page gets room to scroll past it.
+ * A full-height layout should subtract the bar itself: height: calc(100dvh - var(--lab-comment-bar, 0px)).
  * ?bare=1 hides the bar and keeps the option switching. Copy includes the full URL, so sliders that write to the query string get reported.
  *
- * The field stays open with the cursor in it. A phone only raises its keyboard after a tap, so the first
- * tap on the field or an option starts dictation. Next and the return key then move on and keep the cursor there.
+ * The field stays open with the cursor in it. A phone may raise its keyboard only after a first tap on the field
+ * or an option. Next and the return key then move on and keep the cursor there.
  */
 (function () {
   if (window.__labComment) return;
@@ -70,18 +71,26 @@
     return;
   }
 
+  // Without this a phone lays the page out 980 px wide, shrinks the bar and zooms when the field takes focus.
+  if (!document.querySelector("meta[name=viewport]")) {
+    var viewport = document.createElement("meta");
+    viewport.name = "viewport";
+    viewport.content = "width=device-width,initial-scale=1";
+    document.head.appendChild(viewport);
+  }
+
+  var FULL_WIDTH = "(max-width:700px),(pointer:coarse)";
   var host = document.createElement("div");
   host.id = "lab-comment";
-  var top = data.corner === "top";
   var root = host.attachShadow({ mode: "open" });
   root.innerHTML =
     "<style>" +
-    ":host{all:initial;position:fixed;z-index:2147483647;left:0;right:0;height:0;" + (top ? "top:0" : "bottom:0") + ";font:14px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}" +
-    ".dock{position:absolute;right:max(12px,env(safe-area-inset-right));" + (top ? "top:max(12px,env(safe-area-inset-top))" : "bottom:max(12px,env(safe-area-inset-bottom))") + ";box-sizing:border-box;max-width:calc(100vw - 24px);display:flex;flex-direction:" + (top ? "column-reverse" : "column") + ";gap:6px;padding:6px;background:#1c1c1e;color:#f5f5f7;border:1px solid rgba(255,255,255,.18);border-radius:16px}" +
+    ":host{all:initial;-webkit-text-size-adjust:100%;text-size-adjust:100%;position:fixed;z-index:2147483647;left:0;right:0;height:0;bottom:0;font:14px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}" +
+    ".dock{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));box-sizing:border-box;max-width:calc(100vw - 24px);display:flex;flex-direction:column;gap:6px;padding:6px;background:#1c1c1e;color:#f5f5f7;border:1px solid rgba(255,255,255,.18);border-radius:16px}" +
     ".dock.open{width:min(440px,calc(100vw - 24px))}" +
     ".dock:not(.open) .field,.dock:not(.open) .copy,.dock:not(.open) .next,.dock:not(.open) .clear,.dock.open .toggle{display:none!important}" +
     ".field{position:relative;display:flex}" +
-    "textarea{box-sizing:border-box;width:100%;min-height:44px;max-height:28vh;resize:none;padding:11px 44px 11px 10px;border:0;border-radius:10px;background:#2c2c2e;color:inherit;font:16px/1.35 inherit;font-family:inherit}" +
+    "textarea{box-sizing:border-box;width:100%;min-height:44px;max-height:28vh;resize:none;padding:11px 44px 11px 10px;border:0;border-radius:10px;background:#2c2c2e;color:inherit;font-size:16px;line-height:1.35;font-family:inherit}" +
     "textarea::placeholder{color:#8e8e93}" +
     ".row{display:flex;align-items:center;gap:6px}.opts{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;min-width:0}.opts::-webkit-scrollbar{display:none}" +
     ".spacer{flex:1}" +
@@ -94,6 +103,10 @@
     "button[disabled]{opacity:.45;cursor:default}" +
     ".hide{position:absolute;top:4px;right:4px;width:36px;height:36px;min-width:0;padding:0;display:flex;align-items:center;justify-content:center;background:transparent;color:#aeaeb2}" +
     "[hidden]{display:none!important}" +
+    "@media " + FULL_WIDTH + "{" +
+    ".dock,.dock.open{left:0;right:0;width:auto;max-width:none;bottom:0;border-width:1px 0 0;border-radius:16px 16px 0 0;padding:8px 12px max(8px,env(safe-area-inset-bottom))}" +
+    ".opts{flex:1}.opts button{flex:1 0 44px}.opts:not([hidden])+.spacer{display:none}" +
+    "}" +
     "</style>" +
     "<div class='dock'>" +
     "<div class='field'><textarea rows='1' autocapitalize='sentences' aria-label='Comment'></textarea>" +
@@ -144,6 +157,18 @@
     nextBtn.hidden = options.length < 2 || clearing;
     clearBtn.hidden = !clearing;
     grow();
+    reserve();
+  }
+
+  var spacer = document.createElement("div");
+  spacer.setAttribute("aria-hidden", "true");
+
+  function reserve() {
+    if (!document.body) return;
+    if (spacer.parentNode !== document.body) document.body.appendChild(spacer);
+    var height = window.matchMedia(FULL_WIDTH).matches ? dock.offsetHeight : 0;
+    spacer.style.cssText = "flex:none;pointer-events:none;height:" + height + "px";
+    document.documentElement.style.setProperty("--lab-comment-bar", height + "px");
   }
 
   function grow() {
@@ -153,7 +178,7 @@
 
   function pick(o) {
     if (o.id === current.id) {
-      if (store.open) box.focus();
+      if (store.open) focusField();
       return;
     }
     current = o;
@@ -170,8 +195,28 @@
       announce();
     }
     paint();
-    if (store.open) box.focus();
+    if (store.open) focusField();
   }
+
+  // iOS scrolls the whole page up by the keyboard's height when a field takes focus, unless focus asks it not to.
+  // An iPhone can also focus the field on load with no keyboard, which needs a fresh focus inside the tap.
+  function keyboardUp() {
+    return !!window.visualViewport && window.innerHeight - window.visualViewport.height > 120;
+  }
+
+  function focusField() {
+    if (root.activeElement === box) {
+      if (keyboardUp()) return;
+      box.blur();
+    }
+    box.focus({ preventScroll: true });
+  }
+
+  box.addEventListener("touchend", function (e) {
+    if (keyboardUp()) return;
+    e.preventDefault();
+    focusField();
+  }, { passive: false });
 
   function next() {
     pick(options[(options.indexOf(current) + 1) % options.length]);
@@ -181,7 +226,7 @@
     store.open = open;
     write();
     paint();
-    if (open) box.focus();
+    if (open) focusField();
   }
 
   function compile() {
@@ -242,7 +287,7 @@
     clearing = false;
     write();
     paint();
-    box.focus();
+    focusField();
   };
 
   // Keys on a Mac: return moves to the next option, shift-return adds a line, Esc hides the box and c brings it back.
@@ -258,7 +303,7 @@
 
   // iOS leaves position:fixed behind the keyboard, so lift the bar by the height the keyboard takes.
   var view = window.visualViewport;
-  if (view && !top) {
+  if (view) {
     var place = function () {
       var hidden = Math.max(0, window.innerHeight - view.height - view.offsetTop);
       dock.style.transform = hidden ? "translateY(" + -hidden + "px)" : "";
@@ -269,7 +314,9 @@
 
   document.documentElement.appendChild(host);
   paint();
-  if (store.open) box.focus({ preventScroll: true });
+  window.addEventListener("resize", reserve);
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", reserve);
+  if (store.open) focusField();
   announce();
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", announce);
 })();
