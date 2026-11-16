@@ -19,7 +19,6 @@ Engineering:
 - `create-skill`: Create or update portable Agent Skills and install them for Claude Code and Codex.
 - `unconfuse`: Audit a codebase for contradictory patterns, ambiguous defaults, and code-versus-doc mismatches.
 - `codex-implementation`: Hand a scoped, well-specified change to Codex CLI, then verify its diff.
-- `codex-review`: Get an independent Codex CLI review of uncommitted changes, a branch diff, or a commit.
 - `codex-computer-use`: Have Codex CLI drive a browser, simulator, or running app to verify behavior.
 - `t3-worktree-cleanup`: Weekly scheduled cleanup of finished git worktrees on a machine running T3 Code.
 - `design-lab`: Show design options so they can be judged on a phone or a Mac, as inline pages, hosted video, or throwaway builds with a comment bar.
