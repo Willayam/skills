@@ -7,15 +7,19 @@ of guessing when T3's database or the process list can't be read.
 """
 
 import argparse
+import datetime
+import hashlib
 import json
 import os
 import re
 import shutil
 import socket
+import shlex
 import sqlite3
 import subprocess
 import sys
 import time
+import tempfile
 from pathlib import Path
 
 HOME = Path.home()
@@ -54,6 +58,7 @@ SCRATCH_DIRS = {".context"}
 SCRATCH_PATHS = (".wrangler/state",)
 ACTIVE_RUN_STATES = ("queued", "preparing", "starting", "running", "waiting")
 RECENT_SECONDS = 24 * 3600
+STALE_SECONDS = 7 * 24 * 3600
 
 
 class Stop(Exception):
@@ -135,19 +140,26 @@ def t3_state():
             )
         }
         threads = {}
-        for tid, title, wt, root, arch, deleted, settled, pinned in con.execute(
+        for tid, title, wt, root, arch, deleted, settled, pinned, updated in con.execute(
             """select thread_id, title,
                    json_extract(payload_json,'$.worktreePath'),
                    coalesce(json_extract(payload_json,'$.lineage.rootThreadId'), thread_id),
                    archived_at, deleted_at,
                    json_extract(payload_json,'$.settledAt'),
-                   json_extract(payload_json,'$.pinnedAt')
+                   json_extract(payload_json,'$.pinnedAt'), updated_at
                from orchestration_v2_projection_threads"""
         ):
             threads[tid] = dict(
                 title=title, wt=wt, root=root, arch=arch, deleted=deleted,
-                settled=settled, pinned=pinned,
+                settled=settled, pinned=pinned, activity=timestamp(updated),
             )
+        for table, columns in (
+            ("orchestration_v2_projection_messages", "max(updated_at)"),
+            ("orchestration_v2_projection_runs", "max(coalesce(completed_at, requested_at))"),
+        ):
+            for tid, updated in con.execute(f"select thread_id, {columns} from {table} group by thread_id"):
+                if tid in threads:
+                    threads[tid]["activity"] = max(threads[tid]["activity"], timestamp(updated))
     finally:
         con.close()
 
@@ -156,7 +168,11 @@ def t3_state():
 
     # A running delegated thread keeps its whole family in use.
     running_roots = {threads[t]["root"] for t in running if t in threads}
-    uses = {}
+    pinned_roots = {t["root"] for t in threads.values() if t["pinned"] and not t["deleted"]}
+    family_activity = {}
+    for t in threads.values():
+        family_activity[t["root"]] = max(family_activity.get(t["root"], 0), t["activity"])
+    uses, activity, thread_ids = {}, {}, {}
     for tid, t in threads.items():
         if not t["wt"]:
             continue
@@ -167,7 +183,7 @@ def t3_state():
             continue
         elif r is None:
             state = "open"  # parent thread unknown, so assume it is in use
-        elif r["pinned"] or t["pinned"]:
+        elif t["root"] in pinned_roots:
             state = "pinned"
         elif r["deleted"]:
             continue
@@ -179,7 +195,17 @@ def t3_state():
             state = "settled"
         title = r["title"] if r else t["title"]
         uses.setdefault(real(t["wt"]), []).append((title, state))
-    return uses, roots
+        activity[real(t["wt"])] = max(activity.get(real(t["wt"]), 0), family_activity[t["root"]])
+        if state == "settled":
+            thread_ids.setdefault(real(t["wt"]), set()).add(t["root"])
+    return uses, roots, activity, thread_ids
+
+
+def timestamp(value):
+    try:
+        return datetime.datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+    except (ValueError, AttributeError):
+        return time.time()  # Unknown activity must never make a thread look stale.
 
 
 def process_cwds():
@@ -272,15 +298,43 @@ def refresh_default_branch(repo, notes):
     return ref if git(repo, "rev-parse", "--verify", "--quiet", ref)[0] == 0 else None
 
 
-def last_activity(path):
-    """Newest of worktree creation and its last checkout or commit."""
+def last_activity(path, ctx=None):
+    """Newest thread, checkout, or source-file activity; ignore generated output."""
     rc, out = git(path, "rev-parse", "--absolute-git-dir")
     if rc != 0:
         return time.time()
     admin = Path(out.strip())
     stamps = [
-        f.stat().st_mtime for f in (admin / "gitdir", admin / "logs/HEAD") if f.exists()
+        f.stat().st_mtime for f in (admin / "gitdir", admin / "logs/HEAD", admin / "index") if f.exists()
     ]
+    if ctx:
+        stamps.append(ctx.get("activity", {}).get(real(path), 0))
+    rc, files = git(path, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+    if rc != 0:
+        return time.time()
+    try:
+        for name in filter(None, files.split("\0")):
+            target = Path(path) / name
+            if target.exists() or target.is_symlink():
+                stat = target.lstat()
+                stamps.extend((stat.st_mtime, stat.st_ctime))
+        # Kept ignored files can also be work in progress. Prune build output.
+        def walk_error(error):
+            raise error
+
+        for folder, dirs, names in os.walk(path, onerror=walk_error):
+            rel = os.path.relpath(folder, path)
+            stat = Path(folder).stat()
+            stamps.extend((stat.st_mtime, stat.st_ctime))
+            dirs[:] = [d for d in dirs if d != ".git" and not os.path.islink(os.path.join(folder, d))
+                       and ignored_kind(os.path.join(rel, d).removeprefix("./") + "/") == "keep"]
+            for name in names:
+                entry = os.path.join(rel, name).removeprefix("./")
+                if name != ".git" and ignored_kind(entry) == "keep":
+                    stat = (Path(path) / entry).lstat()
+                    stamps.extend((stat.st_mtime, stat.st_ctime))
+    except OSError:
+        return time.time()
     return max(stamps, default=time.time())
 
 
@@ -385,48 +439,161 @@ def in_use(rp, ctx):
     return None
 
 
-def judge(wt, ctx):
-    """Return (remove?, reason)."""
+def clean_blocker(wt, ctx):
+    """Shared gates for remote backup and deletion, regardless of age."""
     path, repo = wt["path"], wt["repo"]
     rp = real(path)
-    states = {s for _, s in ctx["uses"].get(rp, [])}
 
     allowed = [real(r) for r in WORKTREE_ROOTS] + [real(Path(repo) / ".claude/worktrees")]
     if not any(strictly_inside(rp, r) for r in allowed):
-        return False, "outside the agent worktree folders"
+        return "outside the agent worktree folders"
     if wt.get("locked"):
-        return False, "locked"
+        return "locked"
     busy = in_use(rp, ctx)
     if busy:
-        return False, busy
+        return busy
     op = unfinished_op(path)
     if op:
-        return False, f"a git operation is paused in it, {op}"
+        return f"a git operation is paused in it, {op}"
     nested = [o for o in ctx["all_paths"] if strictly_inside(o, rp)]
     if nested:
-        return False, f"contains another checkout, {short(nested[0])}"
+        return f"contains another checkout, {short(nested[0])}"
     edits = tracked_edits(path)
     if edits:
-        return False, f"{len(edits)} uncommitted edits"
+        return f"{len(edits)} uncommitted edits"
     hidden = hidden_edits(path)
     if hidden:
-        return False, f"{len(hidden)} files git status skips, such as {hidden[0]}"
+        return f"{len(hidden)} files git status skips, such as {hidden[0]}"
     loose, _ = untracked(path)
     if loose:
-        return False, f"{len(loose)} untracked files, such as {loose[0]}"
+        return f"{len(loose)} untracked files, such as {loose[0]}"
     keep, scratch = ignored(path)
     if keep:
-        return False, f"ignored files that aren't build output, such as {keep[0]}"
-    if wt.get("detached") and not git(path, "for-each-ref", "--contains", "HEAD", "--count=1")[1].strip():
-        return False, "detached HEAD with commits no branch has"
+        return f"ignored files that aren't build output, such as {keep[0]}"
     inner = nested_repo(path)
     if inner:
-        return False, f"contains a nested git repo, {short(inner)}"
+        return f"contains a nested git repo, {short(inner)}"
+    return None
+
+
+def archive_branch(wt):
+    name = wt.get("branch") or "detached"
+    name = re.sub(r"[^A-Za-z0-9_-]+", "-", str(name).removeprefix("refs/heads/")).strip("-")[:80]
+    identity = hashlib.sha256(real(wt["path"]).encode()).hexdigest()[:12]
+    return f"archive/{name or 'work'}-{identity}-{wt['head']}"
+
+
+def remote_archive(wt):
+    """Check the server itself, not a cached remote-tracking ref."""
+    ref = "refs/heads/" + archive_branch(wt)
+    rc, out = git(wt["path"], "ls-remote", "--exit-code", "origin", ref)
+    return rc == 0 and out.strip() == f"{wt['head']}\t{ref}"
+
+
+def remote_contains_head(wt):
+    rc, refs = git(wt["path"], "ls-remote", "--heads", "origin")
+    return rc == 0 and any(
+        git(wt["path"], "merge-base", "--is-ancestor", wt["head"], line.split()[0])[0] == 0
+        for line in refs.splitlines() if line.split()
+    )
+
+
+def archive_blocker(wt, ctx):
+    blocker = clean_blocker(wt, ctx)
+    if blocker:
+        return blocker
+    if time.time() - last_activity(wt["path"], ctx) < STALE_SECONDS:
+        return "used in the last seven days"
+    branch = str(wt.get("branch", "")).removeprefix("refs/heads/")
+    prs = ctx["prs"][wt["repo"]]
+    if prs is None:
+        return "couldn't check its PR this run"
+    if prs.get(branch, {}).get("state") == "OPEN":
+        return f"PR #{prs[branch]['number']} open"
+    return None
+
+
+def scan_unpublished(wt):
+    """Scan every commit not reachable from a currently advertised remote branch."""
+    path = wt["path"]
+    rc, refs = git(path, "ls-remote", "--heads", "origin")
+    if rc:
+        return "couldn't read origin, nothing pushed"
+    known = []
+    for line in refs.splitlines():
+        oid = line.split()[0]
+        if re.fullmatch(r"[0-9a-f]{40,64}", oid) and git(path, "cat-file", "-e", oid + "^{commit}")[0] == 0:
+            known.append(oid)
+    revisions = [wt["head"]] + (["--not", *sorted(set(known))] if known else [])
+    rc, commits = git(path, "rev-list", *revisions)
+    if rc:
+        return "couldn't identify unpublished commits, nothing pushed"
+    if not commits.strip():
+        return None
+    scanner = shutil.which("gitleaks")
+    if not scanner:
+        return "unpublished commits need gitleaks installed before an automatic push"
+    # Do not let a repository's config or ignore file disable the backup scan.
+    with tempfile.TemporaryDirectory(prefix="worktree-secrets-") as tmp:
+        config = Path(tmp) / "gitleaks.toml"
+        config.write_text("[extend]\nuseDefault = true\n")
+        rc, _, _ = run([
+            scanner, "git", "--no-banner", "--redact", "--config", str(config),
+            "--gitleaks-ignore-path", os.devnull, "--ignore-gitleaks-allow",
+            "--log-opts=" + " ".join(revisions), path,
+        ], timeout=900)
+    return "secret scan flagged unpublished history or could not finish; review locally, nothing pushed" if rc else None
+
+
+def fresh_context(ctx):
+    fresh = dict(ctx)
+    fresh["uses"], fresh["project_roots"], fresh["activity"], fresh["thread_ids"] = t3_state()
+    fresh["cwds"] = process_cwds()
+    return fresh
+
+
+def prepare_archive(wt, ctx):
+    """Preserve clean stale history remotely. Never remove or commit any files."""
+    blocker = archive_blocker(wt, ctx)
+    if blocker:
+        return blocker
+    backed_up = remote_archive(wt)
+    if not backed_up:
+        blocker = scan_unpublished(wt)
+        if blocker:
+            return blocker
+    try:
+        fresh = fresh_context(ctx)
+    except Stop as e:
+        return f"stopped, {e}"
+    blocker = archive_blocker(wt, fresh)
+    if blocker or head(wt["path"]) != wt["head"]:
+        return blocker or "HEAD moved since the check"
+    if backed_up:
+        return None
+    ref = "refs/heads/" + archive_branch(wt)
+    # The empty lease permits creation only, including if another writer races us.
+    rc, _ = git(wt["path"], "push", "--porcelain", "--force-with-lease=" + ref + ":",
+                "origin", wt["head"] + ":" + ref, timeout=180)
+    if not remote_archive(wt):
+        return "push failed or remote verification failed; worktree kept" if rc else "remote verification failed; worktree kept"
+    return None
+
+
+def judge(wt, ctx):
+    """Return (remove?, reason)."""
+    path, repo = wt["path"], wt["repo"]
+    blocker = clean_blocker(wt, ctx)
+    if blocker:
+        return False, blocker
+    states = {s for _, s in ctx["uses"].get(real(path), [])}
+    _, scratch = ignored(path)
 
     extra = f", and its scratch {', '.join(scratch)}" if scratch else ""
-    if states == {"archived"}:
-        return True, "its threads are archived" + extra
-    if time.time() - last_activity(path) < RECENT_SECONDS:
+    age = time.time() - last_activity(path, ctx)
+    if (states == {"archived"} or age >= STALE_SECONDS) and remote_archive(wt):
+        return True, f"remote backup verified at origin/{archive_branch(wt)}" + extra
+    if age < RECENT_SECONDS:
         return False, "used in the last day"
 
     main = ctx["main"][repo]
@@ -440,7 +607,9 @@ def judge(wt, ctx):
     if pr and pr["state"] in ("MERGED", "CLOSED"):
         h = head(path)
         if h == pr["headRefOid"] or git(path, "merge-base", "--is-ancestor", h, pr["headRefOid"])[0] == 0:
-            return True, f"PR #{pr['number']} {pr['state'].lower()}" + extra
+            if remote_contains_head(wt):
+                return True, f"PR #{pr['number']} {pr['state'].lower()}, commits verified on origin" + extra
+            return False, f"PR #{pr['number']} {pr['state'].lower()}, needs a verified remote backup"
         return False, f"has commits PR #{pr['number']} didn't include"
     if pr:
         return False, f"PR #{pr['number']} open"
@@ -460,9 +629,7 @@ def remove(wt, ctx):
     if not ok:
         return f"changed since the check, now {why}"
     try:
-        fresh = dict(ctx)
-        fresh["uses"], fresh["project_roots"] = t3_state()
-        fresh["cwds"] = process_cwds()
+        fresh = fresh_context(ctx)
     except Stop as e:
         return f"stopped, {e}"
     busy = in_use(real(wt["path"]), fresh)
@@ -470,6 +637,9 @@ def remove(wt, ctx):
         return f"changed since the check, now {busy}"
     if head(wt["path"]) != wt["head"]:
         return "HEAD moved since the check"
+    ok, why = judge(wt, fresh)
+    if not ok:
+        return f"changed since the check, now {why}"
     _, links = untracked(wt["path"])
     for f in links:
         link = os.path.join(wt["path"], f)
@@ -495,19 +665,22 @@ def leftover_folders(all_paths):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--apply", action="store_true", help="remove what passes; default is a dry run")
+    ap.add_argument("--apply", action="store_true", help="perform the selected action; default is a dry run")
+    ap.add_argument("--prepare-archives", action="store_true",
+                    help="back up clean work idle for seven days instead of removing worktrees")
     args = ap.parse_args()
 
     before = free_gb()
     try:
-        uses, project_roots = t3_state()
+        uses, project_roots, activity, thread_ids = t3_state()
         cwds = process_cwds()
     except Stop as e:
         print(f"Worktree cleanup stopped before removing anything: {e}")
         return 2
     repos = discover_repos(project_roots)
     notes, wts = [], []
-    ctx = dict(uses=uses, project_roots=project_roots, cwds=cwds, prs={}, main={})
+    ctx = dict(uses=uses, project_roots=project_roots, activity=activity,
+               thread_ids=thread_ids, cwds=cwds, prs={}, main={})
     for repo in repos.values():
         ctx["main"][repo] = refresh_default_branch(repo, notes)
         ctx["prs"][repo] = pr_states(repo, notes)
@@ -520,9 +693,27 @@ def main():
     missing = [w for w in wts if not os.path.isdir(w["path"])]
     ctx["all_paths"] = [real(w["path"]) for w in present] + [real(r) for r in repos.values()]
 
-    removed, held, failed = [], [], []
+    removed, held, failed, ready, review = [], [], [], [], []
     for w in sorted(present, key=lambda w: w["path"]):
         w["head"] = head(w["path"])
+        if args.prepare_archives:
+            why = archive_blocker(w, ctx)
+            if why:
+                held.append((w["path"], why))
+                if not in_use(real(w["path"]), ctx) and time.time() - last_activity(w["path"], ctx) >= STALE_SECONDS:
+                    status = git(w["path"], "status", "--short")[1].strip()
+                    keep, _ = ignored(w["path"])
+                    if status or keep:
+                        review.append((w["path"], status, keep))
+            elif not args.apply:
+                ready.append(w)
+            else:
+                err = prepare_archive(w, ctx)
+                if err:
+                    failed.append((w["path"], err))
+                else:
+                    ready.append(w)
+            continue
         ok, why = judge(w, ctx)
         if not ok:
             held.append((w["path"], why))
@@ -532,7 +723,7 @@ def main():
             err = remove(w, ctx)
             (failed if err else removed).append((w["path"], err or why))
 
-    if args.apply:
+    if args.apply and not args.prepare_archives:
         for root in WORKTREE_ROOTS:
             for d in root.iterdir() if root.is_dir() else []:
                 if d.is_dir() and not d.is_symlink() and set(os.listdir(d)) <= {".DS_Store"}:
@@ -542,9 +733,31 @@ def main():
 
     after = free_gb()
     host = socket.gethostname().split(".")[0]
-    mode = "applied" if args.apply else "dry run, nothing removed"
+    mode = "applied" if args.apply else "dry run, nothing removed or pushed"
     print(f"Worktree cleanup on {host}, {time.strftime('%Y-%m-%d %H:%M')} ({mode})")
     print(f"Free space: {before:.1f} GB before, {after:.1f} GB after")
+    if args.prepare_archives:
+        label = "Remote backups verified, ready for thread archive and cleanup" if args.apply else "Would back up after secret scan"
+        print(f"\n{label} ({len(ready)}):")
+        for w in ready:
+            branch = archive_branch(w)
+            print(f"  {short(w['path'])}  origin/{branch}")
+            print(f"    Commit: {w['head']}")
+            ready_paths = {real(item['path']) for item in ready}
+            eligible_ids = {tid for tid in ctx['thread_ids'].get(real(w['path']), [])
+                            if all(p in ready_paths or not os.path.exists(p)
+                                   for p, tids in ctx['thread_ids'].items() if tid in tids)}
+            print(f"    Thread IDs: {', '.join(sorted(eligible_ids)) or '(none ready)'}")
+            print(f"    Recover: git -C {shlex.quote(w['repo'])} fetch origin {shlex.quote(branch)}")
+            print(f"             git -C {shlex.quote(w['repo'])} worktree add --detach {shlex.quote(w['path'])} {w['head']}")
+        if review:
+            print(f"\nStale files needing review before any commit or push ({len(review)}):")
+            for path, status, keep in review:
+                print(f"  {short(path)}")
+                for line in status.splitlines():
+                    print(f"    {line}")
+                for name in keep:
+                    print(f"    ignored: {name}")
     print(f"\n{'Removed' if args.apply else 'Would remove'} ({len(removed)}):")
     for p, why in removed:
         print(f"  {short(p)}  {why}")
