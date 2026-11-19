@@ -9,6 +9,7 @@ top-level directory with a `SKILL.md` and optional `references/`, `scripts/`, `a
 ```bash
 npx skills add https://github.com/Willayam/skills --skill unconfuse
 npx skills add https://github.com/Willayam/skills --skill advisor charlie derek elon hormozi katie marcus naval steve tony
+npx skills add https://github.com/Willayam/skills --skill rumelt christensen blue-ocean hardy helmer martin
 ```
 
 ## Skills
@@ -40,3 +41,9 @@ Advisors:
 - `naval`: Naval Ravikant on leverage, wealth, and long-term games.
 - `steve`: Steve Jobs on product taste, simplicity, and focus.
 - `tony`: Tony Robbins on outcomes, state, and massive action.
+- `rumelt`: Richard Rumelt on diagnosis, the crux, and good versus bad strategy.
+- `christensen`: Clayton Christensen on disruption, jobs to be done, and why big companies stall.
+- `blue-ocean`: Kim and Mauborgne on the strategy canvas, noncustomers, and new demand.
+- `hardy`: Benjamin Hardy on 10x versus 2x, what to stop doing, and who not how.
+- `helmer`: Hamilton Helmer on the 7 Powers, moats, and counter-positioning.
+- `martin`: Roger Martin on the choice cascade and what would have to be true.
